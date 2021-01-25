@@ -1,0 +1,60 @@
+version: "3"
+
+services:
+  nginx-upstream:
+    depends_on:
+      - nginx_server1
+    image: nginx:${DOCKER_NGINX_UPSTREAM_VERSION}
+    container_name: nginx-upstream
+    ports:
+      - ${DOCKER_NGINX_UPSTREAM_PORT}:80
+    volumes:
+      - ${DOCKER_NGINX_UPSTREAM_CONF_FILE}:/etc/nginx/nginx.conf
+
+  nginx_server1:
+    image: nginx:${DOCKER_NGINX_VERSION}
+    ports:
+      - ${DOCKER_NGINX_PORT}:80
+    volumes:
+      - ${DOCKER_NGINX_CONF_FILE}:/etc/nginx/nginx.conf
+      - ${DOCKER_APP_PATH}:/var/www/html
+      - socket:/var/run
+    links:
+      - php_server1
+      - db
+
+  php_server1:
+    build:
+      context: ./docker/php
+      args:
+        - PHP_VERSION=${DOCKER_PHP_VERSION}
+    env_file:
+      - ./.env
+    volumes:
+      - ${DOCKER_APP_PATH}:/var/www/html
+      - ${DOCKER_PHP_CONF_FILE}:/usr/local/etc/php-fpm.d/zz-docker.conf
+      - socket:/var/run
+
+  composer:
+    image: composer:${DOCKER_COMPOSER_VERSION}
+    volumes:
+      - ${DOCKER_APP_PATH}:/app
+    links:
+      - php_server1
+
+  db:
+    image: postgres:${DOCKER_POSTGRES_VERSION}
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+  selenium-chrome:
+    image: selenium/standalone-chrome
+    ports:
+      - ${DOCKER_SELENIUM_PORT}:4444
+    links:
+      - nginx-upstream
+
+volumes:
+  socket:
